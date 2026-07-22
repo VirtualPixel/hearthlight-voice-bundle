@@ -1,0 +1,69 @@
+name: build-windows
+
+# Freezes the renderer on real Windows and proves it renders before anything ships.
+# The onedir artifact this produces becomes the windows-x86_64 renderer/_internal
+# assets of a voice bundle release; the platform-neutral assets (frontend,
+# base-model, asr) are shared with the other platforms and downloaded here only
+# to give the smoke run a complete bundle to chew on. The reference clip is
+# synthesized on the runner with the OS speech engine, so no real voice is ever
+# committed to this repository.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned build environment
+        run: pip install -r build/requirements.txt
+
+      - name: Freeze renderer
+        shell: pwsh
+        run: |
+          $env:HL_RENDER_PY = "$PWD/build/render.py"
+          pyinstaller --noconfirm --clean --distpath dist --workpath work build/renderer.spec
+          if (-not (Test-Path "dist/renderer/renderer.exe")) { throw "no renderer.exe produced" }
+
+      - name: Assemble smoke bundle from the shared release assets
+        shell: pwsh
+        run: |
+          $rel = "https://github.com/VirtualPixel/hearthlight-voice-bundle/releases/download/hl-voice-1-e80a77d372c9"
+          New-Item -ItemType Directory -Force -Path bundle/frontend, bundle/base-model, bundle/asr | Out-Null
+          foreach ($a in "frontend", "base-model", "asr") {
+            Invoke-WebRequest -Uri "$rel/$a.tar.gz" -OutFile "$a.tar.gz"
+            tar -xzf "$a.tar.gz" -C "bundle/$a"
+            Remove-Item "$a.tar.gz"
+          }
+          Copy-Item dist/renderer/renderer.exe bundle/
+          Copy-Item -Recurse dist/renderer/_internal bundle/_internal
+
+      - name: Synthesize a reference clip with the OS speech engine
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.Speech
+          $s = New-Object System.Speech.Synthesis.SpeechSynthesizer
+          $s.SetOutputToWaveFile("$PWD/ref.wav")
+          $s.Speak("The house has been listening to every word since the first candle was lit.")
+          $s.Dispose()
+
+      - name: Smoke render
+        run: python build/smoke.py --bundle bundle --ref ref.wav --out out
+
+      - name: Report sizes and hashes
+        shell: pwsh
+        run: |
+          Get-ChildItem dist/renderer | Format-Table Name, Length
+          (Get-FileHash dist/renderer/renderer.exe -Algorithm SHA256).Hash
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: renderer-windows-x86_64
+          path: dist/renderer
+          compression-level: 6
