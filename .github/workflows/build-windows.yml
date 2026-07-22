@@ -37,7 +37,8 @@ jobs:
           $rel = "https://github.com/VirtualPixel/hearthlight-voice-bundle/releases/download/hl-voice-1-e80a77d372c9"
           New-Item -ItemType Directory -Force -Path bundle/frontend, bundle/base-model, bundle/asr | Out-Null
           foreach ($a in "frontend", "base-model", "asr") {
-            Invoke-WebRequest -Uri "$rel/$a.tar.gz" -OutFile "$a.tar.gz"
+            curl.exe -L --retry 5 --retry-delay 10 --retry-all-errors -o "$a.tar.gz" "$rel/$a.tar.gz"
+            if ($LASTEXITCODE -ne 0) { throw "download failed: $a" }
             tar -xzf "$a.tar.gz" -C "bundle/$a"
             Remove-Item "$a.tar.gz"
           }
