@@ -1,0 +1,54 @@
+name: test-rpguard
+
+# Reproduces the household pre-launch failure on real Windows PowerShell 5.1:
+# exercises the guard script over a fixture instance and prints exit codes for
+# every invocation style the launcher might use.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build fixture instance
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path fixture | Out-Null
+          @'
+version:3465
+key_key.sneak:key.mouse.4
+key_key.sprint:key.keyboard.left.shift
+key_key.emotecraft.fastchoose:key.keyboard.b
+key_key.sophisticatedbackpacks.open_backpack:key.keyboard.b
+resourcePacks:["file/HearthlightTitle.zip"]
+'@ | Set-Content fixture/options.txt
+          @'
+key_key.sneak:key.mouse.4
+key_key.sprint:key.keyboard.left.shift
+key_key.emotecraft.fastchoose:key.keyboard.r
+key_key.sophisticatedbackpacks.open_backpack:key.keyboard.b
+'@ | Set-Content fixture/.hearthlight-keybind-baseline
+          @'
+key_key.emotecraft.fastchoose:key.keyboard.b
+key_key.sneak:key.keyboard.left.shift
+'@ | Set-Content fixture/.hearthlight-mod-defaults
+          Copy-Item build/rp-guard.ps1 fixture/rp-guard.ps1
+
+      - name: Invoke via Windows PowerShell 5.1, forward slashes
+        shell: cmd
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%/fixture/rp-guard.ps1" "%CD%/fixture"
+          echo EXITCODE_FWD=%ERRORLEVEL%
+
+      - name: Invoke via Windows PowerShell 5.1, backslashes
+        shell: cmd
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\fixture\rp-guard.ps1" "%CD%\fixture"
+          echo EXITCODE_BACK=%ERRORLEVEL%
+
+      - name: Show repaired options
+        shell: pwsh
+        run: Get-Content fixture/options.txt
