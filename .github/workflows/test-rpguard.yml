@@ -17,30 +17,27 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path fixture | Out-Null
-          @'
-version:3465
-key_key.sneak:key.mouse.4
-key_key.sprint:key.keyboard.left.shift
-key_key.emotecraft.fastchoose:key.keyboard.b
-key_key.sophisticatedbackpacks.open_backpack:key.keyboard.b
-resourcePacks:["file/HearthlightTitle.zip"]
-'@ | Set-Content fixture/options.txt
-          @'
-key_key.sneak:key.mouse.4
-key_key.sprint:key.keyboard.left.shift
-key_key.emotecraft.fastchoose:key.keyboard.r
-key_key.sophisticatedbackpacks.open_backpack:key.keyboard.b
-'@ | Set-Content fixture/.hearthlight-keybind-baseline
-          @'
-key_key.emotecraft.fastchoose:key.keyboard.b
-key_key.sneak:key.keyboard.left.shift
-'@ | Set-Content fixture/.hearthlight-mod-defaults
+          $opts = @("version:3465",
+            "key_key.sneak:key.mouse.4",
+            "key_key.sprint:key.keyboard.left.shift",
+            "key_key.emotecraft.fastchoose:key.keyboard.b",
+            "key_key.sophisticatedbackpacks.open_backpack:key.keyboard.b",
+            'resourcePacks:["file/HearthlightTitle.zip"]')
+          Set-Content fixture/options.txt -Value $opts
+          $base = @("key_key.sneak:key.mouse.4",
+            "key_key.sprint:key.keyboard.left.shift",
+            "key_key.emotecraft.fastchoose:key.keyboard.r",
+            "key_key.sophisticatedbackpacks.open_backpack:key.keyboard.b")
+          Set-Content fixture/.hearthlight-keybind-baseline -Value $base
+          $defs = @("key_key.emotecraft.fastchoose:key.keyboard.b",
+            "key_key.sneak:key.keyboard.left.shift")
+          Set-Content fixture/.hearthlight-mod-defaults -Value $defs
           Copy-Item build/rp-guard.ps1 fixture/rp-guard.ps1
 
       - name: Invoke via Windows PowerShell 5.1, forward slashes
         shell: cmd
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%/fixture/rp-guard.ps1" "%CD%/fixture"
+          powershell -NoProfile -ExecutionPolicy Bypass -File "%CD:\=/%/fixture/rp-guard.ps1" "%CD:\=/%/fixture"
           echo EXITCODE_FWD=%ERRORLEVEL%
 
       - name: Invoke via Windows PowerShell 5.1, backslashes
